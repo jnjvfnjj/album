@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import { Album, Photo, StorageStats } from '../types';
 import { SAMPLE_COVERS } from '../utils/sampleImages';
+import { extractAlbumFromUrl } from '../utils/albumUrl';
 import { deletePhotoBlob, deletePhotoBlobsForAlbum, getPhotoBlob, savePhotoBlob } from './db';
 
 const ALBUMS_STORAGE_KEY = 'aperture_albums_v1';
@@ -177,6 +178,14 @@ class StorageService {
       }
     } catch (err) {
       console.warn('Fetch album by token from server failed', err);
+    }
+
+    // 3. Fallback to URL-embedded album metadata (for Vercel / serverless deployments)
+    const fromUrl = extractAlbumFromUrl(normalized);
+    if (fromUrl) {
+      this.albums.unshift(fromUrl);
+      this.saveAlbums();
+      return fromUrl;
     }
 
     return undefined;

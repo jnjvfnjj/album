@@ -32,15 +32,15 @@ function parseRoute(currentPath: string): RouteMatch {
   if (path.startsWith('#')) path = path.slice(1);
   if (!path.startsWith('/')) path = '/' + path;
 
-  // Check query parameters for fallback: ?upload=token or ?gallery=token
+  // Check query parameters for guest upload: ?upload=token or ?u=token
   if (typeof window !== 'undefined') {
     const params = new URLSearchParams(window.location.search);
-    const uploadToken = params.get('upload') || params.get('token');
-    if (uploadToken && path === '/') {
+    const uploadToken = params.get('upload') || params.get('u') || params.get('token');
+    if (uploadToken) {
       return { route: '/upload/:token', params: { token: uploadToken }, pathname: `/upload/${uploadToken}` };
     }
     const galleryToken = params.get('gallery');
-    if (galleryToken && path === '/') {
+    if (galleryToken) {
       return { route: '/gallery/:token', params: { token: galleryToken }, pathname: `/gallery/${galleryToken}` };
     }
   }

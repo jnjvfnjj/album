@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Album, UploadItem } from '../types';
 import { storageService } from '../services/storageService';
+import { extractAlbumFromUrl } from '../utils/albumUrl';
 import { useRouter } from '../context/RouterContext';
 import { useI18n } from '../utils/i18n';
 import {
@@ -42,7 +43,12 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
     setLoading(true);
     storageService.getAlbumByToken(token).then((found) => {
       if (!isMounted) return;
-      setAlbum(found || null);
+      if (found) {
+        setAlbum(found);
+      } else {
+        const fromUrl = extractAlbumFromUrl(token);
+        setAlbum(fromUrl || null);
+      }
       setLoading(false);
     });
     return () => {
@@ -234,9 +240,11 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
         </div>
 
         <div className="mx-auto max-w-2xl px-4 sm:px-6 -mt-16 relative z-10 pb-6">
-          <div className="flex items-center gap-2 text-xs font-semibold text-sky-400 uppercase tracking-wider">
+          <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400 uppercase tracking-wider">
             <Camera className="h-3.5 w-3.5" />
-            <span>Event Photo Upload</span>
+            <span>Гостевая загрузка фото</span>
+            <span aria-hidden="true">·</span>
+            <span className="text-neutral-400 font-normal">Только отправка</span>
           </div>
 
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
@@ -258,7 +266,7 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
             )}
             <span className="flex items-center gap-1 text-neutral-300">
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-              <span>Zero-install · No account needed</span>
+              <span>Без регистрации · Прямая отправка в альбом</span>
             </span>
           </div>
         </div>
@@ -271,45 +279,30 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
           <div className="rounded-2xl border border-amber-900/50 bg-amber-950/20 p-8 text-center">
             <PauseCircle className="mx-auto h-12 w-12 text-amber-400" />
             <h3 className="mt-4 text-base font-bold text-white">
-              {t.uploadsPausedTitle}
+              Прием фотографий приостановлен
             </h3>
             <p className="mt-2 text-xs text-neutral-400">
-              {t.uploadsPausedMessage}
+              Организатор мероприятия временно приостановил прием новых фотографий.
             </p>
-            <button
-              onClick={() => navigate(`/gallery/${album.publicToken}`)}
-              className="mt-6 inline-flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-900 px-4 py-2 text-xs font-medium text-white hover:bg-neutral-800"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              <span>{t.viewEventGalleryBtn}</span>
-            </button>
           </div>
         ) : uploadSuccess ? (
-          /* Success Screen */
+          /* Success Screen - Upload Only */
           <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-8 text-center shadow-xl">
             <CheckCircle2 className="mx-auto h-14 w-14 text-emerald-400" />
             <h3 className="mt-4 text-xl font-bold text-white">
-              {t.uploadSuccessTitle}
+              Фотографии успешно отправлены!
             </h3>
             <p className="mt-2 text-xs text-neutral-400">
-              {uploadedCount} photo{uploadedCount > 1 ? 's' : ''} added to the live gallery.
+              Спасибо за участие! Ваши снимки ({uploadedCount}) переданы организатору мероприятия.
             </p>
 
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-              <button
-                onClick={() => navigate(`/gallery/${album.publicToken}`)}
-                className="flex items-center justify-center gap-2 rounded-xl bg-neutral-100 px-5 py-3 text-xs font-bold text-neutral-950 transition-all hover:bg-white active:scale-95 shadow-md"
-              >
-                <ExternalLink className="h-4 w-4" />
-                <span>{t.viewEventGalleryBtn}</span>
-              </button>
-
+            <div className="mt-6 flex justify-center">
               <button
                 onClick={handleResetForMore}
-                className="flex items-center justify-center gap-2 rounded-xl border border-neutral-700 bg-neutral-950 px-5 py-3 text-xs font-semibold text-neutral-200 transition-colors hover:bg-neutral-800 hover:text-white"
+                className="flex items-center justify-center gap-2 rounded-xl bg-neutral-100 px-6 py-3 text-xs font-bold text-neutral-950 transition-all hover:bg-white active:scale-95 shadow-md"
               >
                 <Plus className="h-4 w-4" />
-                <span>{t.uploadMore}</span>
+                <span>Загрузить ещё фотографии</span>
               </button>
             </div>
           </div>
@@ -481,15 +474,9 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
               </div>
             )}
 
-            {/* Link to view public gallery */}
-            <div className="text-center pt-2">
-              <button
-                onClick={() => navigate(`/gallery/${album.publicToken}`)}
-                className="inline-flex items-center gap-1.5 text-xs text-neutral-400 hover:text-white transition-colors"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                <span>View current photos in live gallery &rarr;</span>
-              </button>
+            {/* Role Notice */}
+            <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-3.5 text-center text-xs text-neutral-400">
+              <span className="text-neutral-300 font-medium">Гостевой доступ:</span> только загрузка фото. Просмотр всех снимков и управление альбомом доступны только организаторам через сайт.
             </div>
           </div>
         )}

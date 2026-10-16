@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Album } from '../../types';
 import { generateQrDataUrl, downloadBrandedQrSign } from '../../utils/qrCode';
+import { buildGuestUploadUrl, buildPublicGalleryUrl } from '../../utils/albumUrl';
 import { useI18n } from '../../utils/i18n';
 import { useRouter } from '../../context/RouterContext';
 import {
@@ -29,9 +30,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({ album, isOpen, onClose }
   const [activeTab, setActiveTab] = useState<'qr' | 'preview'>('qr');
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://aperture.live';
-  const guestUploadUrl = album ? `${origin}/upload/${album.publicToken}` : '';
-  const publicGalleryUrl = album ? `${origin}/gallery/${album.publicToken}` : '';
+  const guestUploadUrl = album ? buildGuestUploadUrl(album) : '';
+  const publicGalleryUrl = album ? buildPublicGalleryUrl(album) : '';
 
   useEffect(() => {
     if (album && isOpen) {
@@ -196,10 +196,10 @@ export const ShareModal: React.FC<ShareModalProps> = ({ album, isOpen, onClose }
                 <div className="rounded-xl border border-neutral-800 bg-neutral-950/80 p-4">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-white">
-                      {t.guestUploadLink}
+                      QR-код и ссылка для гостей (только загрузка)
                     </span>
                     <span className="text-[10px] text-emerald-400 font-medium">
-                      No sign-up required
+                      Без регистрации
                     </span>
                   </div>
                   <div className="mt-2 flex items-center gap-2">
@@ -216,64 +216,33 @@ export const ShareModal: React.FC<ShareModalProps> = ({ album, isOpen, onClose }
                       {copiedType === 'upload' ? (
                         <>
                           <Check className="h-3.5 w-3.5 text-emerald-400" />
-                          <span className="text-emerald-400">Copied</span>
+                          <span className="text-emerald-400">Скопировано</span>
                         </>
                       ) : (
                         <>
                           <Copy className="h-3.5 w-3.5" />
-                          <span>Copy</span>
+                          <span>Копировать</span>
                         </>
                       )}
                     </button>
                   </div>
-                  <p className="mt-1.5 text-[11px] text-neutral-500">
-                    Give this link or QR code to attendees to collect their photos directly.
+                  <p className="mt-2 text-[11px] text-neutral-400 leading-relaxed">
+                    Гости сканируют QR-код и <strong>могут только загружать свои фото</strong>. Они не могут просматривать чужие снимки или удалять что-либо.
                   </p>
                 </div>
 
-                {/* Public Gallery Link Box */}
-                <div className="rounded-xl border border-neutral-800 bg-neutral-950/80 p-4">
+                {/* Organizer Info Box */}
+                <div className="rounded-xl border border-neutral-800 bg-neutral-900/60 p-4">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-white">
-                      {t.publicGalleryLink}
+                      Управление через сайт (Организаторы)
                     </span>
-                    <button
-                      onClick={() => {
-                        onClose();
-                        navigate(`/gallery/${album.publicToken}`);
-                      }}
-                      className="flex items-center gap-1 text-[11px] text-sky-400 hover:text-sky-300"
-                    >
-                      <ExternalLink className="h-3 w-3" />
-                      <span>View Gallery</span>
-                    </button>
+                    <span className="text-[10px] text-sky-400 font-medium">
+                      Полный доступ
+                    </span>
                   </div>
-                  <div className="mt-2 flex items-center gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      value={publicGalleryUrl}
-                      className="w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-1.5 font-mono text-xs text-neutral-300 focus:outline-none"
-                    />
-                    <button
-                      onClick={() => copyToClipboard(publicGalleryUrl, 'gallery')}
-                      className="flex shrink-0 items-center gap-1 rounded-lg bg-neutral-800 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-neutral-700"
-                    >
-                      {copiedType === 'gallery' ? (
-                        <>
-                          <Check className="h-3.5 w-3.5 text-emerald-400" />
-                          <span className="text-emerald-400">Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-3.5 w-3.5" />
-                          <span>Copy</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  <p className="mt-1.5 text-[11px] text-neutral-500">
-                    Attendees and stakeholders can view the full live stream of event photos.
+                  <p className="mt-1.5 text-[11px] text-neutral-400 leading-relaxed">
+                    Через панель сайта вы можете просматривать все собранные фотографии, скачивать их по отдельности или все сразу архивом ZIP, а также удалять любые снимки.
                   </p>
                 </div>
 
@@ -283,7 +252,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ album, isOpen, onClose }
                   className="flex w-full items-center justify-center gap-2 rounded-lg border border-neutral-700 bg-neutral-950 py-2.5 text-xs font-semibold text-neutral-200 transition-colors hover:border-neutral-600 hover:bg-neutral-800 hover:text-white"
                 >
                   <Share2 className="h-4 w-4" />
-                  <span>{t.nativeShare}</span>
+                  <span>Поделиться ссылкой для гостей</span>
                 </button>
               </div>
             </div>

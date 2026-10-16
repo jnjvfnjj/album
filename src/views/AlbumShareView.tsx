@@ -4,6 +4,7 @@ import { storageService } from '../services/storageService';
 import { useRouter } from '../context/RouterContext';
 import { Navbar } from '../components/layout/Navbar';
 import { generateQrDataUrl, downloadBrandedQrSign } from '../utils/qrCode';
+import { buildGuestUploadUrl, buildPublicGalleryUrl } from '../utils/albumUrl';
 import { useI18n } from '../utils/i18n';
 import {
   ArrowLeft,
@@ -37,8 +38,7 @@ export const AlbumShareView: React.FC<AlbumShareViewProps> = ({ id }) => {
       if (!isMounted) return;
       if (a) {
         setAlbum(a);
-        const origin = typeof window !== 'undefined' ? window.location.origin : 'https://aperture.live';
-        const uploadUrl = `${origin}/upload/${a.publicToken}`;
+        const uploadUrl = buildGuestUploadUrl(a);
         generateQrDataUrl(uploadUrl, 600).then((url) => {
           if (isMounted) setQrDataUrl(url);
         });
@@ -80,9 +80,8 @@ export const AlbumShareView: React.FC<AlbumShareViewProps> = ({ id }) => {
     );
   }
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://aperture.live';
-  const guestUploadUrl = `${origin}/upload/${album.publicToken}`;
-  const publicGalleryUrl = `${origin}/gallery/${album.publicToken}`;
+  const guestUploadUrl = album ? buildGuestUploadUrl(album) : '';
+  const publicGalleryUrl = album ? buildPublicGalleryUrl(album) : '';
 
   const copyToClipboard = async (text: string, type: 'upload' | 'gallery') => {
     try {
@@ -241,46 +240,30 @@ export const AlbumShareView: React.FC<AlbumShareViewProps> = ({ id }) => {
               </div>
             </div>
 
-            {/* Public Gallery Link Box */}
+            {/* Organizer Notice Box */}
             <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-white">
-                  {t.publicGalleryLink}
+                  Управление альбомом (для вас / организаторов)
                 </span>
-                <button
-                  onClick={() => navigate(`/gallery/${album.publicToken}`)}
-                  className="flex items-center gap-1 text-xs text-sky-400 hover:underline"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  <span>Open Gallery</span>
-                </button>
+                <span className="text-xs text-sky-400 font-medium">
+                  Полный доступ
+                </span>
               </div>
-              <p className="mt-1 text-xs text-neutral-400">
-                Read-only gallery feed displaying all crowdsourced photos with high-resolution lightbox and ZIP download.
+              <p className="mt-2 text-xs text-neutral-300 leading-relaxed">
+                Гости, сканирующие QR-код, попадают на страницу <strong>только для загрузки</strong>. Они не могут просматривать чужие фото или удалять снимки.
+              </p>
+              <p className="mt-1.5 text-xs text-neutral-400 leading-relaxed">
+                Только те, у кого есть доступ через сайт (вы), могут просматривать все фото, скачивать их по отдельности или архивом ZIP, и удалять любые фотографии.
               </p>
 
-              <div className="mt-3 flex items-center gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={publicGalleryUrl}
-                  className="w-full rounded-xl border border-neutral-800 bg-neutral-950 px-3.5 py-2 font-mono text-xs text-neutral-200 focus:outline-none"
-                />
+              <div className="mt-4">
                 <button
-                  onClick={() => copyToClipboard(publicGalleryUrl, 'gallery')}
-                  className="flex shrink-0 items-center gap-1.5 rounded-xl bg-neutral-800 px-4 py-2 text-xs font-semibold text-white hover:bg-neutral-700 transition-colors"
+                  onClick={() => navigate(`/albums/${album.id}`)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-800 px-3.5 py-2 text-xs font-semibold text-white hover:bg-neutral-700 transition-colors"
                 >
-                  {copiedType === 'gallery' ? (
-                    <>
-                      <Check className="h-4 w-4 text-emerald-400" />
-                      <span className="text-emerald-400">Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4" />
-                      <span>Copy</span>
-                    </>
-                  )}
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span>Перейти к просмотру и управлению фото в альбоме</span>
                 </button>
               </div>
             </div>
