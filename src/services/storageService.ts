@@ -375,7 +375,8 @@ class StorageService {
     albumId: string,
     file: File,
     contributorName = 'Гость',
-    albumMeta?: { title?: string; publicToken?: string; description?: string }
+    albumMeta?: { title?: string; publicToken?: string; description?: string },
+    options: { requireServerPersistence?: boolean } = {}
   ): Promise<Photo> {
     // Compress and downscale modern smartphone photos (e.g. from 15MB down to ~300KB-600KB)
     const compressed = await compressImage(file);
@@ -392,13 +393,21 @@ class StorageService {
     };
 
     // 1. Post to server (accessible from all devices immediately!)
+    let res: Response | undefined;
     try {
-      const res = await fetch(`/api/albums/${albumId}/photos`, {
+      res = await fetch(`/api/albums/${albumId}/photos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(photoPayload),
       });
+    } catch (err) {
+      console.warn('Server upload failed', err);
+      if (options.requireServerPersistence) {
+        throw new Error('Не удалось связаться с сервером. Фото не было добавлено в альбом. Проверьте подключение и попробуйте ещё раз.', { cause: err });
+      }
+    }
 
+    if (res) {
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         const serverPhoto: Photo = await res.json();
@@ -410,9 +419,31 @@ class StorageService {
         }
       } else {
         console.warn('Server upload returned non-JSON or status', res.status);
+        if (options.requireServerPersistence) {
+          let message = `Сервер не сохранил фотографию (HTTP ${res.status}).`;
+          if (contentType.includes('application/json')) {
+            try {
+              const body: unknown = await res.json();
+              if (
+                body &&
+                typeof body === 'object' &&
+                'error' in body &&
+                typeof body.error === 'string' &&
+                body.error.trim()
+              ) {
+                message = body.error;
+              }
+            } catch (err) {
+              console.warn('Could not read server upload error response', err);
+            }
+          }
+          throw new Error(message);
+        }
       }
-    } catch (err) {
-      console.warn('Server upload failed, falling back to local storage', err);
+    }
+
+    if (options.requireServerPersistence) {
+      throw new Error('Сервер не подтвердил сохранение фотографии. Фото не было добавлено в альбом.');
     }
 
     // 2. Local fallback

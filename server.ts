@@ -114,11 +114,13 @@ function loadPhotos(): Photo[] {
   return [];
 }
 
-function savePhotos(photos: Photo[]) {
+function savePhotos(photos: Photo[]): boolean {
   try {
     fs.writeFileSync(PHOTOS_FILE, JSON.stringify(photos, null, 2), 'utf-8');
+    return true;
   } catch (err) {
     console.error('Error saving photos file', err);
+    return false;
   }
 }
 
@@ -352,7 +354,9 @@ app.post('/api/albums/:id/photos', (req, res) => {
   };
 
   photos.unshift(newPhoto);
-  savePhotos(photos);
+  if (!savePhotos(photos)) {
+    return res.status(500).json({ error: 'Не удалось сохранить фотографию. Попробуйте ещё раз позже.' });
+  }
   res.status(201).json(newPhoto);
 });
 

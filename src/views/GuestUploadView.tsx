@@ -138,6 +138,7 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token = '' }) 
     setErrorMessage('');
 
     const completedThumbnails: { previewUrl: string; filename: string }[] = [];
+    const failedItems: UploadItem[] = [];
 
     for (let i = 0; i < queue.length; i++) {
       const item = queue[i];
@@ -161,7 +162,8 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token = '' }) 
             title: album.title,
             publicToken: album.publicToken,
             description: album.description,
-          }
+          },
+          { requireServerPersistence: true }
         );
 
         setQueue((prev) =>
@@ -175,6 +177,7 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token = '' }) 
       } catch (err: unknown) {
         console.error('Upload error', err);
         const errorMsg = err instanceof Error ? err.message : 'Ошибка при загрузке фото';
+        failedItems.push({ ...item, status: 'error', errorMessage: errorMsg });
         setQueue((prev) =>
           prev.map((q, idx) =>
             idx === i ? { ...q, status: 'error', errorMessage: errorMsg } : q
@@ -187,8 +190,16 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token = '' }) 
 
     if (completedThumbnails.length > 0) {
       setUploadedPhotos(completedThumbnails);
-      setUploadSuccess(true);
+    }
+
+    if (failedItems.length === 0) {
+      setUploadSuccess(completedThumbnails.length > 0);
       setQueue([]);
+    } else {
+      setQueue(failedItems);
+      setErrorMessage(
+        `Не удалось отправить ${failedItems.length} фото на сервер. Они не добавлены в альбом. Проверьте подключение и повторите попытку.`
+      );
     }
   };
 
