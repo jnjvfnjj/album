@@ -165,8 +165,25 @@ class StorageService {
     return undefined;
   }
 
+  // Synchronous lookup for 0ms instant mobile rendering
+  public getCachedAlbumByToken(token: string): Album | undefined {
+    if (!this.initialized) this.init();
+    const normalized = token.trim().toLowerCase();
+    const local = this.albums.find((a) => a.publicToken.toLowerCase() === normalized);
+    if (local) return local;
+
+    // Check if query params or hash has album metadata
+    if (typeof window !== 'undefined') {
+      const fromUrl = extractAlbumFromUrl(normalized);
+      if (fromUrl && fromUrl.title && !fromUrl.title.startsWith('Мероприятие (')) {
+        return fromUrl;
+      }
+    }
+    return undefined;
+  }
+
   // CRITICAL FOR QR SCANNING FROM ANY PHONE / DEVICE!
-  public async getAlbumByToken(token: string): Promise<Album | undefined> {
+  public async getAlbumByToken(token: string): Promise<Album> {
     if (!this.initialized) this.init();
     const normalized = token.trim().toLowerCase();
 
@@ -174,9 +191,16 @@ class StorageService {
     const local = this.albums.find((a) => a.publicToken.toLowerCase() === normalized);
     if (local) return local;
 
-    // 2. Fetch from server (when scanned on another mobile phone!)
+    // 2. Fetch from server with 2.5s strict timeout so phone never hangs
     try {
-      const res = await fetch(`/api/albums/by-token/${normalized}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+      const res = await fetch(`/api/albums/by-token/${normalized}`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         const album = await res.json();
@@ -188,18 +212,14 @@ class StorageService {
         }
       }
     } catch (err) {
-      console.warn('Fetch album by token from server failed', err);
+      console.warn('Fetch album by token from server failed or timed out', err);
     }
 
-    // 3. Fallback to URL-embedded album metadata (for Vercel / serverless deployments)
+    // 3. Fallback to URL-embedded album metadata or guaranteed fallback object
     const fromUrl = extractAlbumFromUrl(normalized);
-    if (fromUrl) {
-      this.albums.unshift(fromUrl);
-      this.saveAlbums();
-      return fromUrl;
-    }
-
-    return undefined;
+    this.albums.unshift(fromUrl);
+    this.saveAlbums();
+    return fromUrl;
   }
 
   public async createAlbum(albumData: Omit<Album, 'id' | 'createdAt' | 'publicToken'> & { publicToken?: string }): Promise<Album> {

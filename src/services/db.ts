@@ -8,23 +8,48 @@ const DB_NAME = 'ApertureLiveDB';
 const DB_VERSION = 1;
 const PHOTO_STORE = 'photos_blobs';
 
+const memoryStore = new Map<string, string>();
+
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    if (typeof window === 'undefined' || !window.indexedDB) {
+      return reject(new Error('IndexedDB not supported'));
+    }
 
-    request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      if (!db.objectStoreNames.contains(PHOTO_STORE)) {
-        db.createObjectStore(PHOTO_STORE, { keyPath: 'id' });
-      }
-    };
+    try {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+      const timeout = setTimeout(() => {
+        reject(new Error('IndexedDB open timeout'));
+      }, 1500);
+
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result;
+        if (!db.objectStoreNames.contains(PHOTO_STORE)) {
+          db.createObjectStore(PHOTO_STORE, { keyPath: 'id' });
+        }
+      };
+
+      request.onsuccess = () => {
+        clearTimeout(timeout);
+        resolve(request.result);
+      };
+      request.onerror = () => {
+        clearTimeout(timeout);
+        reject(request.error);
+      };
+      request.onblocked = () => {
+        clearTimeout(timeout);
+        reject(new Error('IndexedDB blocked'));
+      };
+    } catch (e) {
+      reject(e);
+    }
   });
 }
 
 export async function savePhotoBlob(id: string, dataUrl: string): Promise<void> {
+  memoryStore.set(id, dataUrl);
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
@@ -36,11 +61,14 @@ export async function savePhotoBlob(id: string, dataUrl: string): Promise<void> 
       req.onerror = () => reject(req.error);
     });
   } catch (err) {
-    console.warn('Failed to save in IndexedDB, fallback to in-memory', err);
+    console.warn('Saved in memory store fallback', err);
   }
 }
 
 export async function getPhotoBlob(id: string): Promise<string | null> {
+  if (memoryStore.has(id)) {
+    return memoryStore.get(id) || null;
+  }
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
@@ -54,8 +82,8 @@ export async function getPhotoBlob(id: string): Promise<string | null> {
       req.onerror = () => reject(req.error);
     });
   } catch (err) {
-    console.warn('Failed to get from IndexedDB', err);
-    return null;
+    console.warn('Failed to get from IndexedDB, checking memory', err);
+    return memoryStore.get(id) || null;
   }
 }
 

@@ -28,8 +28,13 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
   const { navigate } = useRouter();
   const { t } = useI18n();
 
-  const [album, setAlbum] = useState<Album | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Instant 0ms synchronous resolution: loads immediately on phone without any dark waiting screen
+  const [album, setAlbum] = useState<Album>(() => {
+    const cached = storageService.getCachedAlbumByToken(token);
+    if (cached) return cached;
+    return extractAlbumFromUrl(token);
+  });
+  const [loading, setLoading] = useState(false);
   const [contributorName, setContributorName] = useState('');
   const [queue, setQueue] = useState<UploadItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -38,18 +43,14 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
   const [uploadedPhotos, setUploadedPhotos] = useState<{ previewUrl: string; filename: string }[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Background non-blocking sync to retrieve any extra album metadata from server
   useEffect(() => {
     let isMounted = true;
-    setLoading(true);
     storageService.getAlbumByToken(token).then((found) => {
       if (!isMounted) return;
       if (found) {
         setAlbum(found);
-      } else {
-        const fromUrl = extractAlbumFromUrl(token);
-        setAlbum(fromUrl || null);
       }
-      setLoading(false);
     });
     return () => {
       isMounted = false;
@@ -287,9 +288,9 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
             {album.eventDate && (
               <span>🗓️ {new Date(album.eventDate).toLocaleDateString('ru-RU')}</span>
             )}
-            <span className="flex items-center gap-1 text-neutral-300">
+            <span className="flex items-center gap-1.5 rounded-full border border-emerald-800/60 bg-emerald-950/40 px-2.5 py-0.5 text-emerald-300 font-medium">
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-              <span>Без регистрации · Прямая отправка в альбом</span>
+              <span>QR-код бессрочен (24+ часа) · Прямая отправка в альбом</span>
             </span>
           </div>
         </div>

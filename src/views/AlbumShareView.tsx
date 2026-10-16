@@ -169,6 +169,12 @@ export const AlbumShareView: React.FC<AlbumShareViewProps> = ({ id }) => {
               )}
             </div>
 
+            {/* 24h+ Validity Guarantee Badge */}
+            <div className="mb-4 flex items-center justify-center gap-1.5 rounded-xl border border-emerald-800/60 bg-emerald-950/40 px-3 py-2 text-xs font-semibold text-emerald-300">
+              <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0" />
+              <span>Срок действия QR: бессрочно (более 24 часов) · Активен всегда</span>
+            </div>
+
             <div className="flex w-full flex-col gap-2.5">
               <button
                 onClick={handlePrintSignage}

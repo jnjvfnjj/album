@@ -15,6 +15,8 @@ import { SettingsView } from './views/SettingsView';
 import { AuthView } from './views/AuthView';
 import { LandingView } from './views/LandingView';
 
+import { ErrorBoundary } from './components/ErrorBoundary';
+
 function AppRoutes() {
   const { match } = useRouter();
 
@@ -42,10 +44,12 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <RouterProvider>
-        <AppRoutes />
-      </RouterProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <RouterProvider>
+          <AppRoutes />
+        </RouterProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

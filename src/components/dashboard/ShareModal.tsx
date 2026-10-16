@@ -171,6 +171,12 @@ export const ShareModal: React.FC<ShareModalProps> = ({ album, isOpen, onClose }
                   )}
                 </div>
 
+                {/* 24h+ Validity Guarantee Badge */}
+                <div className="mb-3 flex items-center justify-center gap-1.5 rounded-lg border border-emerald-800/60 bg-emerald-950/40 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-300">
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Срок действия QR: бессрочно (более 24 часов)</span>
+                </div>
+
                 <div className="flex w-full flex-col gap-2">
                   <button
                     onClick={handleDownloadQrPng}

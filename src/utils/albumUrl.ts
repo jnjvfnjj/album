@@ -37,33 +37,72 @@ export function buildPublicGalleryUrl(album: Album, baseUrl?: string): string {
  * Reconstructs or enriches an album from URL query parameters if it's missing from local/server DB
  * (e.g. when a new phone scans a QR code for an album created on another computer).
  */
-export function extractAlbumFromUrl(token: string): Album | null {
-  if (typeof window === 'undefined') return null;
+export function extractAlbumFromUrl(token: string): Album {
+  const fallbackTitle = `Мероприятие (${token ? token.substring(0, 6) : 'Live'})`;
+  if (typeof window === 'undefined') {
+    return {
+      id: `album_${token}`,
+      ownerId: 'external_guest',
+      title: fallbackTitle,
+      coverUrl: SAMPLE_COVERS.aiSummit,
+      publicToken: token,
+      privacy: 'public',
+      uploadsEnabled: true,
+      createdAt: new Date().toISOString(),
+    };
+  }
 
   try {
-    const params = new URLSearchParams(window.location.search);
-    const title = params.get('t') || params.get('name') || params.get('title') || `Event (${token})`;
+    let searchStr = window.location.search || '';
+    if (!searchStr && window.location.hash.includes('?')) {
+      searchStr = window.location.hash.slice(window.location.hash.indexOf('?'));
+    }
+    const params = new URLSearchParams(searchStr);
+
+    const safeDecode = (val: string | null | undefined): string => {
+      if (!val) return '';
+      try {
+        return decodeURIComponent(val);
+      } catch {
+        return val;
+      }
+    };
+
+    const rawTitle = params.get('t') || params.get('name') || params.get('title');
     const albumId = params.get('id') || `album_${token}`;
-    const description = params.get('d') || params.get('desc') || undefined;
-    const location = params.get('l') || params.get('loc') || undefined;
+    const rawDesc = params.get('d') || params.get('desc');
+    const rawLoc = params.get('l') || params.get('loc');
     const eventDate = params.get('dt') || params.get('date') || undefined;
     const privacy = (params.get('p') as 'public' | 'code_protected') || 'public';
+
+    const title = rawTitle ? safeDecode(rawTitle) : fallbackTitle;
+    const description = rawDesc ? safeDecode(rawDesc) : undefined;
+    const location = rawLoc ? safeDecode(rawLoc) : undefined;
 
     return {
       id: albumId,
       ownerId: 'external_guest',
-      title: decodeURIComponent(title),
-      description: description ? decodeURIComponent(description) : undefined,
+      title: title || fallbackTitle,
+      description,
       coverUrl: SAMPLE_COVERS.aiSummit,
       publicToken: token,
       privacy,
       uploadsEnabled: true,
       createdAt: new Date().toISOString(),
-      location: location ? decodeURIComponent(location) : undefined,
-      eventDate: eventDate || undefined,
+      location,
+      eventDate,
     };
   } catch (err) {
     console.warn('Failed to parse album from URL', err);
-    return null;
+    return {
+      id: `album_${token}`,
+      ownerId: 'external_guest',
+      title: fallbackTitle,
+      coverUrl: SAMPLE_COVERS.aiSummit,
+      publicToken: token,
+      privacy: 'public',
+      uploadsEnabled: true,
+      createdAt: new Date().toISOString(),
+    };
   }
 }
