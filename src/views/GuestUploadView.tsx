@@ -226,29 +226,6 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 pb-16">
-      {/* Hidden file inputs for direct camera and gallery triggers */}
-      <input
-        id="guest-camera-input"
-        type="file"
-        accept="image/*"
-        capture="environment"
-        onChange={(e) => {
-          handleFiles(e.target.files);
-          e.target.value = '';
-        }}
-        className="hidden"
-      />
-      <input
-        id="guest-gallery-input"
-        type="file"
-        accept="image/*,.heic,.heif,.jpg,.jpeg,.png,.webp"
-        multiple
-        onChange={(e) => {
-          handleFiles(e.target.files);
-          e.target.value = '';
-        }}
-        className="hidden"
-      />
 
       {/* Top Navigation Bar with Back Button */}
       <div className="border-b border-neutral-800 bg-neutral-950/90 backdrop-blur-md px-4 py-3">
@@ -422,65 +399,133 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
               </div>
             )}
 
-            {/* Mobile-Friendly Upload Buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Native Camera Trigger */}
-              <label
-                htmlFor="guest-camera-input"
-                className="flex items-center justify-center gap-2.5 rounded-xl border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 hover:border-neutral-600 px-4 py-3.5 text-xs font-bold text-white cursor-pointer transition-all active:scale-95 shadow-sm"
-              >
-                <Camera className="h-4 w-4 text-emerald-400" />
-                <span>Сделать фото на камеру</span>
-              </label>
-
-              {/* Native Gallery Trigger */}
-              <label
-                htmlFor="guest-gallery-input"
-                className="flex items-center justify-center gap-2.5 rounded-xl border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 hover:border-neutral-600 px-4 py-3.5 text-xs font-bold text-white cursor-pointer transition-all active:scale-95 shadow-sm"
-              >
-                <ImageIcon className="h-4 w-4 text-sky-400" />
-                <span>Выбрать из галереи</span>
-              </label>
+            {/* Primary Action Button: "Загрузить фото в альбом" */}
+            <div className="relative overflow-hidden rounded-2xl bg-white p-4 shadow-xl transition-all hover:bg-neutral-100 active:scale-[0.99] cursor-pointer">
+              <input
+                type="file"
+                accept="image/*,.heic,.heif,.jpg,.jpeg,.png,.webp"
+                multiple
+                onChange={(e) => {
+                  handleFiles(e.target.files);
+                  e.target.value = '';
+                }}
+                className="absolute inset-0 h-full w-full opacity-0 cursor-pointer z-20"
+                aria-label="Загрузить фото в альбом"
+              />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-neutral-950 text-white shadow-md">
+                    <UploadCloud className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="text-left">
+                    <h3 className="text-sm font-bold text-neutral-950 sm:text-base">
+                      Загрузить фото в альбом
+                    </h3>
+                    <p className="text-xs text-neutral-600">
+                      Нажмите, чтобы выбрать снимки из памяти телефона или сделать фото
+                    </p>
+                  </div>
+                </div>
+                <div className="hidden sm:flex rounded-lg bg-neutral-950 px-3 py-1.5 text-xs font-bold text-white">
+                  Выбрать
+                </div>
+              </div>
             </div>
 
-            {/* Drag and drop upload zone (also clickable) */}
-            <label
-              htmlFor="guest-gallery-input"
+            {/* Direct Camera and Gallery Quick Selectors */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Native Camera Trigger */}
+              <div className="relative overflow-hidden rounded-xl border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 hover:border-neutral-600 px-4 py-3.5 text-xs font-bold text-white transition-all active:scale-95 shadow-sm cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={(e) => {
+                    handleFiles(e.target.files);
+                    e.target.value = '';
+                  }}
+                  className="absolute inset-0 h-full w-full opacity-0 cursor-pointer z-20"
+                  aria-label="Сделать фото на камеру"
+                />
+                <div className="flex items-center justify-center gap-2.5">
+                  <Camera className="h-4 w-4 text-emerald-400" />
+                  <span>Сделать фото на камеру</span>
+                </div>
+              </div>
+
+              {/* Native Gallery Trigger */}
+              <div className="relative overflow-hidden rounded-xl border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 hover:border-neutral-600 px-4 py-3.5 text-xs font-bold text-white transition-all active:scale-95 shadow-sm cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/*,.heic,.heif,.jpg,.jpeg,.png,.webp"
+                  multiple
+                  onChange={(e) => {
+                    handleFiles(e.target.files);
+                    e.target.value = '';
+                  }}
+                  className="absolute inset-0 h-full w-full opacity-0 cursor-pointer z-20"
+                  aria-label="Выбрать из галереи"
+                />
+                <div className="flex items-center justify-center gap-2.5">
+                  <ImageIcon className="h-4 w-4 text-sky-400" />
+                  <span>Выбрать из галереи</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Drag and drop upload zone */}
+            <div
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              className={`block cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition-all ${
+              className={`relative overflow-hidden rounded-2xl border-2 border-dashed p-7 text-center transition-all cursor-pointer ${
                 isDragging
                   ? 'border-sky-400 bg-sky-950/20'
                   : 'border-neutral-700 bg-neutral-900/60 hover:border-neutral-600 hover:bg-neutral-900'
               }`}
             >
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-neutral-700 bg-neutral-950 text-neutral-300 shadow-inner">
-                <UploadCloud className="h-7 w-7 text-neutral-400" />
+              <input
+                type="file"
+                accept="image/*,.heic,.heif,.jpg,.jpeg,.png,.webp"
+                multiple
+                onChange={(e) => {
+                  handleFiles(e.target.files);
+                  e.target.value = '';
+                }}
+                className="absolute inset-0 h-full w-full opacity-0 cursor-pointer z-20"
+                aria-label="Выбрать фото для альбома"
+              />
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-neutral-700 bg-neutral-950 text-neutral-300 shadow-inner">
+                <UploadCloud className="h-6 w-6 text-neutral-400" />
               </div>
 
-              <h4 className="mt-4 text-sm font-bold text-white sm:text-base">
-                Нажмите для выбора фото или перетащите сюда
+              <h4 className="mt-3 text-sm font-bold text-white">
+                Перетащите фото сюда или нажмите для выбора
               </h4>
               <p className="mt-1 text-xs text-neutral-400">
-                Поддерживаются JPG, PNG, HEIC с телефона (до 30 МБ)
+                Поддерживаются любые фото с телефона: JPG, PNG, HEIC (до 30 МБ)
               </p>
-            </label>
+            </div>
 
-            {/* Preview of pending files */}
+            {/* Preview of pending files & upload trigger */}
             {queue.length > 0 && (
-              <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+              <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-4 shadow-xl">
                 <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
-                  <span className="text-xs font-bold text-white">
-                    Выбрано фото для отправки ({queue.length})
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-white">
+                      Выбрано для отправки:
+                    </span>
+                    <span className="rounded-full bg-neutral-800 px-2 py-0.5 text-xs font-mono font-bold text-white">
+                      {queue.length}
+                    </span>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setQueue([])}
                     disabled={isUploading}
                     className="text-xs text-neutral-400 hover:text-white"
                   >
-                    Очистить
+                    Очистить все
                   </button>
                 </div>
 
@@ -539,24 +584,24 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
                   ))}
                 </div>
 
-                {/* Submit Batch Button */}
+                {/* Submit Batch Button: "Загрузить в альбом" */}
                 <div className="mt-4 pt-3 border-t border-neutral-800">
                   <button
                     type="button"
                     onClick={startUpload}
                     disabled={isUploading}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-white py-3.5 text-xs font-bold text-neutral-950 transition-all hover:bg-neutral-100 active:scale-95 shadow-md disabled:opacity-50"
+                    className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-white py-4 text-xs font-bold text-neutral-950 transition-all hover:bg-neutral-100 active:scale-95 shadow-xl disabled:opacity-50"
                   >
                     {isUploading ? (
                       <>
                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-950 border-t-transparent" />
-                        <span>Сжатие и отправка фото в альбом...</span>
+                        <span>Загрузка в альбом... Обработка фото</span>
                       </>
                     ) : (
                       <>
                         <UploadCloud className="h-4 w-4" />
                         <span>
-                          Отправить фото в альбом ({queue.length})
+                          Загрузить в альбом ({queue.length})
                         </span>
                       </>
                     )}
@@ -567,7 +612,7 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
 
             {/* Role Notice */}
             <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-3.5 text-center text-xs text-neutral-400">
-              <span className="text-neutral-300 font-medium">Гостевой доступ:</span> только загрузка фото. Просмотр всех снимков и управление альбомом доступны только организаторам через сайт.
+              <span className="text-neutral-300 font-medium">Гостевой доступ:</span> вы можете только загружать фото. Просмотр всех снимков и управление альбомом доступны только организаторам через сайт.
             </div>
           </div>
         )}

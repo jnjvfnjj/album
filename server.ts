@@ -13,14 +13,32 @@ const PORT = Number(process.env.PORT) || 3000;
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Ensure permanent data storage directory exists
-const DATA_DIR = path.join(__dirname, 'data');
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+function getDataDir(): string {
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    const tmpData = path.join('/tmp', 'aperture_data');
+    try {
+      if (!fs.existsSync(tmpData)) fs.mkdirSync(tmpData, { recursive: true });
+      return tmpData;
+    } catch {
+      // fallback
+    }
+  }
+  const localData = path.join(__dirname, 'data');
+  try {
+    if (!fs.existsSync(localData)) fs.mkdirSync(localData, { recursive: true });
+    return localData;
+  } catch {
+    const tmpData = path.join('/tmp', 'aperture_data');
+    if (!fs.existsSync(tmpData)) fs.mkdirSync(tmpData, { recursive: true });
+    return tmpData;
+  }
 }
 
+const DATA_DIR = getDataDir();
 const ALBUMS_FILE = path.join(DATA_DIR, 'albums.json');
 const PHOTOS_FILE = path.join(DATA_DIR, 'photos.json');
+const SEED_ALBUMS_FILE = path.join(__dirname, 'data', 'albums.json');
+const SEED_PHOTOS_FILE = path.join(__dirname, 'data', 'photos.json');
 
 interface Album {
   id: string;
@@ -53,6 +71,15 @@ function loadAlbums(): Album[] {
     if (fs.existsSync(ALBUMS_FILE)) {
       return JSON.parse(fs.readFileSync(ALBUMS_FILE, 'utf-8'));
     }
+    if (fs.existsSync(SEED_ALBUMS_FILE)) {
+      const data = fs.readFileSync(SEED_ALBUMS_FILE, 'utf-8');
+      try {
+        fs.writeFileSync(ALBUMS_FILE, data, 'utf-8');
+      } catch {
+        // ignore
+      }
+      return JSON.parse(data);
+    }
   } catch (err) {
     console.error('Error reading albums file', err);
   }
@@ -71,6 +98,15 @@ function loadPhotos(): Photo[] {
   try {
     if (fs.existsSync(PHOTOS_FILE)) {
       return JSON.parse(fs.readFileSync(PHOTOS_FILE, 'utf-8'));
+    }
+    if (fs.existsSync(SEED_PHOTOS_FILE)) {
+      const data = fs.readFileSync(SEED_PHOTOS_FILE, 'utf-8');
+      try {
+        fs.writeFileSync(PHOTOS_FILE, data, 'utf-8');
+      } catch {
+        // ignore
+      }
+      return JSON.parse(data);
     }
   } catch (err) {
     console.error('Error reading photos file', err);
@@ -363,6 +399,10 @@ async function startServer() {
   });
 }
 
-startServer().catch((err) => {
-  console.error('Server failed to start', err);
-});
+if (!process.env.VERCEL) {
+  startServer().catch((err) => {
+    console.error('Server failed to start', err);
+  });
+}
+
+export default app;

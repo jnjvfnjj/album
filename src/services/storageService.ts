@@ -64,7 +64,8 @@ class StorageService {
   public async syncFromServer(): Promise<void> {
     try {
       const res = await fetch('/api/albums');
-      if (res.ok) {
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
         const serverAlbums: Album[] = await res.json();
         if (Array.isArray(serverAlbums) && serverAlbums.length > 0) {
           // Merge unique
@@ -126,10 +127,13 @@ class StorageService {
     // Try server first for multi-device sync
     try {
       const res = await fetch('/api/albums');
-      if (res.ok) {
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
         const serverAlbums: Album[] = await res.json();
-        this.albums = serverAlbums;
-        this.saveAlbums();
+        if (Array.isArray(serverAlbums)) {
+          this.albums = serverAlbums;
+          this.saveAlbums();
+        }
       }
     } catch {
       // Use local fallback
@@ -146,11 +150,14 @@ class StorageService {
 
     try {
       const res = await fetch(`/api/albums/${id}`);
-      if (res.ok) {
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
         const album = await res.json();
-        this.albums.unshift(album);
-        this.saveAlbums();
-        return album;
+        if (album && album.id) {
+          this.albums.unshift(album);
+          this.saveAlbums();
+          return album;
+        }
       }
     } catch {
       // ignore
@@ -170,12 +177,15 @@ class StorageService {
     // 2. Fetch from server (when scanned on another mobile phone!)
     try {
       const res = await fetch(`/api/albums/by-token/${normalized}`);
-      if (res.ok) {
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
         const album = await res.json();
-        // Cache locally on this device
-        this.albums.unshift(album);
-        this.saveAlbums();
-        return album;
+        if (album && album.publicToken) {
+          // Cache locally on this device
+          this.albums.unshift(album);
+          this.saveAlbums();
+          return album;
+        }
       }
     } catch (err) {
       console.warn('Fetch album by token from server failed', err);
@@ -302,7 +312,8 @@ class StorageService {
     // 1. Try server first for multi-device sync
     try {
       const res = await fetch(`/api/albums/${albumId}/photos`);
-      if (res.ok) {
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
         const serverPhotos: Photo[] = await res.json();
         if (Array.isArray(serverPhotos)) {
           // Merge with local cache
@@ -363,15 +374,17 @@ class StorageService {
         body: JSON.stringify(photoPayload),
       });
 
-      if (res.ok) {
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
         const serverPhoto: Photo = await res.json();
-        // Also cache locally
-        this.photos.unshift(serverPhoto);
-        this.savePhotosMeta();
-        return serverPhoto;
+        if (serverPhoto && serverPhoto.id) {
+          // Also cache locally
+          this.photos.unshift(serverPhoto);
+          this.savePhotosMeta();
+          return serverPhoto;
+        }
       } else {
-        const errJson = await res.json().catch(() => ({}));
-        console.warn('Server upload returned non-200', res.status, errJson);
+        console.warn('Server upload returned non-JSON or status', res.status);
       }
     } catch (err) {
       console.warn('Server upload failed, falling back to local storage', err);

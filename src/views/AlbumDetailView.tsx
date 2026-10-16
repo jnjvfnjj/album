@@ -356,23 +356,20 @@ export const AlbumDetailView: React.FC<AlbumDetailViewProps> = ({ id }) => {
               <span>{isZipping ? 'Сборка архива...' : 'Скачать все разом (ZIP)'}</span>
             </button>
 
-            {/* Direct Upload input */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="image/*"
-              onChange={handleOwnerFileUpload}
-              className="hidden"
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800 transition-colors"
-            >
+            {/* Direct Upload button with overlay file input */}
+            <div className="relative overflow-hidden rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800 transition-colors cursor-pointer flex items-center gap-1.5">
+              <input
+                type="file"
+                multiple
+                accept="image/*,.heic,.heif,.jpg,.jpeg,.png,.webp"
+                onChange={handleOwnerFileUpload}
+                disabled={isUploading}
+                className="absolute inset-0 h-full w-full opacity-0 cursor-pointer z-10"
+                aria-label="Добавить фото"
+              />
               <Upload className="h-3.5 w-3.5" />
               <span>{isUploading ? 'Загрузка...' : 'Добавить фото'}</span>
-            </button>
+            </div>
           </div>
         </div>
 
