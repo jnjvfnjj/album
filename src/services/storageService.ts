@@ -3,6 +3,7 @@ import { Album, Photo, StorageStats } from '../types';
 import { SAMPLE_COVERS } from '../utils/sampleImages';
 import { extractAlbumFromUrl } from '../utils/albumUrl';
 import { deletePhotoBlob, deletePhotoBlobsForAlbum, getPhotoBlob, savePhotoBlob } from './db';
+import { compressImage } from '../utils/imageCompressor';
 
 const ALBUMS_STORAGE_KEY = 'aperture_albums_v1';
 const PHOTOS_METADATA_KEY = 'aperture_photos_meta_v1';
@@ -298,12 +299,19 @@ class StorageService {
   public async getPhotosForAlbum(albumId: string): Promise<Photo[]> {
     if (!this.initialized) this.init();
 
-    // Try server first for multi-device sync
+    // 1. Try server first for multi-device sync
     try {
       const res = await fetch(`/api/albums/${albumId}/photos`);
       if (res.ok) {
         const serverPhotos: Photo[] = await res.json();
-        return serverPhotos;
+        if (Array.isArray(serverPhotos)) {
+          // Merge with local cache
+          const existingIds = new Set(serverPhotos.map((p) => p.id));
+          const localOnly = this.photos.filter((p) => p.albumId === albumId && !existingIds.has(p.id));
+          return [...serverPhotos, ...localOnly].sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+        }
       }
     } catch {
       // fallback to local
@@ -327,17 +335,27 @@ class StorageService {
     return resolved.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
-  public async uploadPhoto(albumId: string, file: File, contributorName = 'Guest'): Promise<Photo> {
-    const dataUrl = await this.fileToDataUrl(file);
+  public async uploadPhoto(
+    albumId: string,
+    file: File,
+    contributorName = 'Гость',
+    albumMeta?: { title?: string; publicToken?: string; description?: string }
+  ): Promise<Photo> {
+    // Compress and downscale modern smartphone photos (e.g. from 15MB down to ~300KB-600KB)
+    const compressed = await compressImage(file);
     const photoPayload = {
-      storagePath: dataUrl,
-      originalFilename: file.name,
-      contributorName: contributorName.trim() || 'Guest Contributor',
-      fileSize: file.size,
-      mimeType: file.type || 'image/jpeg',
+      storagePath: compressed.dataUrl,
+      originalFilename: compressed.originalFilename || file.name,
+      contributorName: contributorName.trim() || 'Гость',
+      fileSize: compressed.fileSize,
+      mimeType: compressed.mimeType,
+      albumTitle: albumMeta?.title,
+      publicToken: albumMeta?.publicToken,
+      albumDescription: albumMeta?.description,
+      albumId,
     };
 
-    // 1. Post to server (accessible from all devices forever!)
+    // 1. Post to server (accessible from all devices immediately!)
     try {
       const res = await fetch(`/api/albums/${albumId}/photos`, {
         method: 'POST',
@@ -351,23 +369,26 @@ class StorageService {
         this.photos.unshift(serverPhoto);
         this.savePhotosMeta();
         return serverPhoto;
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        console.warn('Server upload returned non-200', res.status, errJson);
       }
     } catch (err) {
-      console.warn('Server upload failed, storing locally', err);
+      console.warn('Server upload failed, falling back to local storage', err);
     }
 
     // 2. Local fallback
     const photoId = generateId('photo');
-    await savePhotoBlob(photoId, dataUrl);
+    await savePhotoBlob(photoId, compressed.dataUrl);
 
     const newPhoto: Photo = {
       id: photoId,
       albumId,
-      storagePath: dataUrl,
-      originalFilename: file.name,
-      contributorName: contributorName.trim() || 'Guest Contributor',
-      fileSize: file.size,
-      mimeType: file.type || 'image/jpeg',
+      storagePath: compressed.dataUrl,
+      originalFilename: compressed.originalFilename || file.name,
+      contributorName: contributorName.trim() || 'Гость',
+      fileSize: compressed.fileSize,
+      mimeType: compressed.mimeType,
       createdAt: new Date().toISOString(),
     };
 

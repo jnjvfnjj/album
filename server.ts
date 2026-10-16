@@ -107,10 +107,16 @@ app.get('/api/albums/by-token/:token', (req, res) => {
   res.json(album);
 });
 
-// Get album by ID
+// Get album by ID or Token
 app.get('/api/albums/:id', (req, res) => {
+  const param = req.params.id.trim().toLowerCase();
   const albums = loadAlbums();
-  const album = albums.find((a) => a.id === req.params.id);
+  const album = albums.find(
+    (a) =>
+      a.id.toLowerCase() === param ||
+      a.publicToken.toLowerCase() === param ||
+      a.id.toLowerCase() === `album_${param}`
+  );
   if (!album) {
     return res.status(404).json({ error: 'Album not found' });
   }
@@ -148,8 +154,14 @@ app.post('/api/albums', (req, res) => {
 
 // Update album
 app.put('/api/albums/:id', (req, res) => {
+  const param = req.params.id.trim().toLowerCase();
   const albums = loadAlbums();
-  const index = albums.findIndex((a) => a.id === req.params.id);
+  const index = albums.findIndex(
+    (a) =>
+      a.id.toLowerCase() === param ||
+      a.publicToken.toLowerCase() === param ||
+      a.id.toLowerCase() === `album_${param}`
+  );
   if (index === -1) {
     return res.status(404).json({ error: 'Album not found' });
   }
@@ -166,8 +178,14 @@ app.put('/api/albums/:id', (req, res) => {
 
 // Toggle uploads for album
 app.post('/api/albums/:id/toggle-uploads', (req, res) => {
+  const param = req.params.id.trim().toLowerCase();
   const albums = loadAlbums();
-  const album = albums.find((a) => a.id === req.params.id);
+  const album = albums.find(
+    (a) =>
+      a.id.toLowerCase() === param ||
+      a.publicToken.toLowerCase() === param ||
+      a.id.toLowerCase() === `album_${param}`
+  );
   if (!album) {
     return res.status(404).json({ error: 'Album not found' });
   }
@@ -178,41 +196,106 @@ app.post('/api/albums/:id/toggle-uploads', (req, res) => {
 
 // Delete album and its photos
 app.delete('/api/albums/:id', (req, res) => {
+  const param = req.params.id.trim().toLowerCase();
   const albums = loadAlbums();
-  const filteredAlbums = albums.filter((a) => a.id !== req.params.id);
-  if (filteredAlbums.length === albums.length) {
+  const album = albums.find(
+    (a) =>
+      a.id.toLowerCase() === param ||
+      a.publicToken.toLowerCase() === param ||
+      a.id.toLowerCase() === `album_${param}`
+  );
+  if (!album) {
     return res.status(404).json({ error: 'Album not found' });
   }
+  const realId = album.id;
+  const filteredAlbums = albums.filter((a) => a.id !== realId);
   saveAlbums(filteredAlbums);
 
   // Delete photos for this album
   const photos = loadPhotos();
-  const filteredPhotos = photos.filter((p) => p.albumId !== req.params.id);
+  const filteredPhotos = photos.filter((p) => p.albumId !== realId && p.albumId !== album.publicToken);
   savePhotos(filteredPhotos);
 
   res.json({ success: true });
 });
 
-// Get photos for album
+// Get photos for album (searches by real album ID, publicToken, and variations)
 app.get('/api/albums/:id/photos', (req, res) => {
+  const param = req.params.id.trim().toLowerCase();
+  const albums = loadAlbums();
+  const album = albums.find(
+    (a) =>
+      a.id.toLowerCase() === param ||
+      a.publicToken.toLowerCase() === param ||
+      a.id.toLowerCase() === `album_${param}`
+  );
+
+  const realId = album ? album.id : req.params.id;
+  const token = album ? album.publicToken : param;
+
   const photos = loadPhotos();
-  const albumPhotos = photos.filter((p) => p.albumId === req.params.id);
+  const albumPhotos = photos.filter(
+    (p) =>
+      p.albumId === realId ||
+      p.albumId === token ||
+      p.albumId.toLowerCase() === param ||
+      p.albumId.toLowerCase() === `album_${token}`
+  );
   // Newest first
   albumPhotos.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   res.json(albumPhotos);
 });
 
-// Upload photo to album
+// Upload photo to album (CRITICAL: never fails due to token vs ID mismatch)
 app.post('/api/albums/:id/photos', (req, res) => {
-  const albumId = req.params.id;
+  const param = req.params.id.trim().toLowerCase();
   const albums = loadAlbums();
-  const album = albums.find((a) => a.id === albumId);
+  let album = albums.find(
+    (a) =>
+      a.id.toLowerCase() === param ||
+      a.publicToken.toLowerCase() === param ||
+      a.id.toLowerCase() === `album_${param}`
+  );
+
+  // Auto-register album if missing from server's albums.json but metadata sent from QR URL
   if (!album) {
-    return res.status(404).json({ error: 'Album not found' });
+    if (req.body.albumTitle) {
+      album = {
+        id: req.body.albumId || (param.startsWith('album_') ? param : `album_${param}`),
+        ownerId: 'user_demo_alex',
+        title: req.body.albumTitle.trim(),
+        description: req.body.albumDescription || undefined,
+        coverUrl: req.body.albumCoverUrl || '',
+        publicToken: req.body.publicToken || param,
+        privacy: 'public',
+        uploadsEnabled: true,
+        createdAt: new Date().toISOString(),
+        eventDate: req.body.eventDate || undefined,
+        location: req.body.location || undefined,
+      };
+      albums.unshift(album);
+      saveAlbums(albums);
+    } else if (albums.length === 1) {
+      // If only one album exists in the database, attach to it
+      album = albums[0];
+    } else {
+      album = {
+        id: param.startsWith('album_') ? param : `album_${param}`,
+        ownerId: 'user_demo_alex',
+        title: 'Event Album',
+        coverUrl: '',
+        publicToken: param,
+        privacy: 'public',
+        uploadsEnabled: true,
+        createdAt: new Date().toISOString(),
+      };
+      albums.unshift(album);
+      saveAlbums(albums);
+    }
   }
 
-  if (!album.uploadsEnabled) {
-    return res.status(403).json({ error: 'Uploads are currently paused for this album' });
+  if (album && !album.uploadsEnabled) {
+    return res.status(403).json({ error: 'Загрузка фотографий временно приостановлена организатором' });
   }
 
   const { storagePath, originalFilename, contributorName, fileSize, mimeType } = req.body;
@@ -223,11 +306,11 @@ app.post('/api/albums/:id/photos', (req, res) => {
   const photos = loadPhotos();
   const newPhoto: Photo = {
     id: `photo_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`,
-    albumId,
+    albumId: album ? album.id : req.params.id,
     storagePath,
     originalFilename: originalFilename || 'photo.jpg',
-    contributorName: contributorName || 'Guest',
-    fileSize: fileSize || 1500000,
+    contributorName: contributorName || 'Гость',
+    fileSize: fileSize || Math.round((storagePath.length * 3) / 4),
     mimeType: mimeType || 'image/jpeg',
     createdAt: new Date().toISOString(),
   };

@@ -62,6 +62,10 @@ export const DashboardView: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    const interval = setInterval(() => {
+      loadData();
+    }, 4000);
+    return () => clearInterval(interval);
   }, [user]);
 
   // Filtering and sorting

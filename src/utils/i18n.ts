@@ -237,7 +237,8 @@ export const translations = {
   }
 };
 
-let currentLang: Language = 'en';
+let currentLang: Language =
+  (typeof window !== 'undefined' && (localStorage.getItem('aperture_lang') as Language)) || 'ru';
 
 export function getLanguage(): Language {
   return currentLang;

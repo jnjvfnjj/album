@@ -10,23 +10,23 @@ import {
   CheckCircle2,
   AlertCircle,
   X,
-  ExternalLink,
   PauseCircle,
   ShieldCheck,
   Plus,
-  ArrowLeft
+  ArrowLeft,
+  ImageIcon,
+  Sparkles
 } from 'lucide-react';
 
 interface GuestUploadViewProps {
   token: string;
 }
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
+const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30 MB
 
 export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
   const { navigate } = useRouter();
   const { t } = useI18n();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [album, setAlbum] = useState<Album | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,7 +35,7 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
-  const [uploadedCount, setUploadedCount] = useState(0);
+  const [uploadedPhotos, setUploadedPhotos] = useState<{ previewUrl: string; filename: string }[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
@@ -56,7 +56,7 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
     };
   }, [token]);
 
-  // Handle files selected
+  // Handle files selected from camera or gallery
   const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setErrorMessage('');
@@ -66,32 +66,39 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
 
-      // Validate type
-      if (!file.type.match(/^image\/(jpeg|jpg|png|webp|heic)$/i)) {
-        setErrorMessage('Only JPG, JPEG, PNG, and WEBP image files are allowed.');
+      // Relaxed mobile validation: accepts standard MIME types, empty types from iOS cameras, or image extensions
+      const isImage =
+        !file.type ||
+        file.type.startsWith('image/') ||
+        /\.(jpe?g|png|webp|heic|heif|gif|bmp)$/i.test(file.name);
+
+      if (!isImage) {
+        setErrorMessage('Пожалуйста, выберите файл изображения (JPG, PNG, HEIC, WEBP).');
         continue;
       }
 
-      // Validate size
       if (file.size > MAX_FILE_SIZE) {
-        setErrorMessage(`File "${file.name}" exceeds the 20MB limit.`);
+        setErrorMessage(`Файл "${file.name}" превышает допустимый размер 30 МБ.`);
         continue;
       }
 
       const previewUrl = URL.createObjectURL(file);
       newItems.push({
-        id: `upload_${Date.now()}_${i}`,
+        id: `upload_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}`,
         file,
         previewUrl,
-        contributorName: contributorName || 'Guest',
+        contributorName: contributorName || 'Гость',
         progress: 0,
         status: 'pending',
         size: file.size,
-        filename: file.name,
+        filename: file.name || `photo_${Date.now()}.jpg`,
       });
     }
 
-    setQueue((prev) => [...prev, ...newItems]);
+    if (newItems.length > 0) {
+      setQueue((prev) => [...prev, ...newItems]);
+      setUploadSuccess(false);
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -124,32 +131,44 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
     setIsUploading(true);
     setErrorMessage('');
 
-    let successCount = 0;
+    const completedThumbnails: { previewUrl: string; filename: string }[] = [];
 
     for (let i = 0; i < queue.length; i++) {
       const item = queue[i];
 
-      // Update item to uploading
+      // Update item progress
       setQueue((prev) =>
-        prev.map((q, idx) => (idx === i ? { ...q, status: 'uploading', progress: 30 } : q))
+        prev.map((q, idx) => (idx === i ? { ...q, status: 'uploading', progress: 40 } : q))
       );
 
       try {
-        // Small delay for fluid UI feedback
-        await new Promise((r) => setTimeout(r, 150));
-
         setQueue((prev) =>
-          prev.map((q, idx) => (idx === i ? { ...q, progress: 75 } : q))
+          prev.map((q, idx) => (idx === i ? { ...q, progress: 80 } : q))
         );
 
-        await storageService.uploadPhoto(album.id, item.file, contributorName || 'Guest');
+        // Upload to server with automatic client-side compression and metadata forwarding
+        await storageService.uploadPhoto(
+          album.id,
+          item.file,
+          contributorName || 'Гость',
+          {
+            title: album.title,
+            publicToken: album.publicToken,
+            description: album.description,
+          }
+        );
 
         setQueue((prev) =>
           prev.map((q, idx) => (idx === i ? { ...q, status: 'completed', progress: 100 } : q))
         );
-        successCount++;
+
+        completedThumbnails.push({
+          previewUrl: item.previewUrl,
+          filename: item.filename,
+        });
       } catch (err: unknown) {
-        const errorMsg = err instanceof Error ? err.message : 'Upload failed';
+        console.error('Upload error', err);
+        const errorMsg = err instanceof Error ? err.message : 'Ошибка при загрузке фото';
         setQueue((prev) =>
           prev.map((q, idx) =>
             idx === i ? { ...q, status: 'error', errorMessage: errorMsg } : q
@@ -159,18 +178,19 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
     }
 
     setIsUploading(false);
-    setUploadedCount(successCount);
-    if (successCount > 0) {
+
+    if (completedThumbnails.length > 0) {
+      setUploadedPhotos(completedThumbnails);
       setUploadSuccess(true);
+      setQueue([]);
     }
   };
 
   const handleResetForMore = () => {
-    // Revoke all preview URLs
-    queue.forEach((item) => URL.revokeObjectURL(item.previewUrl));
-    setQueue([]);
     setUploadSuccess(false);
-    setUploadedCount(0);
+    setUploadedPhotos([]);
+    setQueue([]);
+    setErrorMessage('');
   };
 
   if (loading) {
@@ -178,7 +198,7 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
       <div className="flex min-h-screen items-center justify-center bg-neutral-950 text-neutral-400">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-700 border-t-white" />
-          <span className="text-xs">Loading event album...</span>
+          <span className="text-xs">Загрузка альбома...</span>
         </div>
       </div>
     );
@@ -189,15 +209,15 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
       <div className="flex min-h-screen items-center justify-center bg-neutral-950 p-4">
         <div className="w-full max-w-md rounded-2xl border border-neutral-800 bg-neutral-900 p-8 text-center">
           <AlertCircle className="mx-auto h-12 w-12 text-neutral-500" />
-          <h2 className="mt-4 text-lg font-bold text-white">Album Not Found</h2>
+          <h2 className="mt-4 text-lg font-bold text-white">Альбом не найден</h2>
           <p className="mt-2 text-xs text-neutral-400">
-            This photo album link may have expired or the token is incorrect.
+            Возможно, ссылка устарела или QR-код недействителен.
           </p>
           <button
             onClick={() => navigate('/dashboard')}
             className="mt-6 inline-flex rounded-lg bg-neutral-100 px-4 py-2 text-xs font-semibold text-neutral-950 hover:bg-white"
           >
-            Go to Aperture Live
+            На главную
           </button>
         </div>
       </div>
@@ -206,6 +226,30 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 pb-16">
+      {/* Hidden file inputs for direct camera and gallery triggers */}
+      <input
+        id="guest-camera-input"
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={(e) => {
+          handleFiles(e.target.files);
+          e.target.value = '';
+        }}
+        className="hidden"
+      />
+      <input
+        id="guest-gallery-input"
+        type="file"
+        accept="image/*,.heic,.heif,.jpg,.jpeg,.png,.webp"
+        multiple
+        onChange={(e) => {
+          handleFiles(e.target.files);
+          e.target.value = '';
+        }}
+        className="hidden"
+      />
+
       {/* Top Navigation Bar with Back Button */}
       <div className="border-b border-neutral-800 bg-neutral-950/90 backdrop-blur-md px-4 py-3">
         <div className="mx-auto flex max-w-2xl items-center justify-between">
@@ -228,15 +272,17 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
 
       {/* Top Banner / Event Header */}
       <div className="relative border-b border-neutral-800 bg-neutral-900">
-        <div className="relative h-44 sm:h-56 w-full overflow-hidden">
+        <div className="relative h-44 sm:h-52 w-full overflow-hidden">
           {album.coverUrl ? (
             <img
               src={album.coverUrl}
               alt={album.title}
               className="h-full w-full object-cover"
             />
-          ) : null}
-          <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/60 to-transparent" />
+          ) : (
+            <div className="h-full w-full bg-gradient-to-br from-neutral-900 via-neutral-950 to-neutral-900" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/70 to-transparent" />
         </div>
 
         <div className="mx-auto max-w-2xl px-4 sm:px-6 -mt-16 relative z-10 pb-6">
@@ -262,7 +308,7 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
               <span>📍 {album.location}</span>
             )}
             {album.eventDate && (
-              <span>🗓️ {new Date(album.eventDate).toLocaleDateString()}</span>
+              <span>🗓️ {new Date(album.eventDate).toLocaleDateString('ru-RU')}</span>
             )}
             <span className="flex items-center gap-1 text-neutral-300">
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
@@ -286,24 +332,66 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
             </p>
           </div>
         ) : uploadSuccess ? (
-          /* Success Screen - Upload Only */
-          <div className="rounded-2xl border border-neutral-800 bg-neutral-900 p-8 text-center shadow-xl">
-            <CheckCircle2 className="mx-auto h-14 w-14 text-emerald-400" />
-            <h3 className="mt-4 text-xl font-bold text-white">
-              Фотографии успешно отправлены!
+          /* SUCCESS SCREEN: Specifically requested confirmation */
+          <div className="rounded-2xl border border-emerald-900/50 bg-neutral-900 p-6 sm:p-8 text-center shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500" />
+
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+              <CheckCircle2 className="h-10 w-10 animate-pulse" />
+            </div>
+
+            <h3 className="mt-4 text-xl sm:text-2xl font-bold text-white">
+              Фотография успешно отправлена!
             </h3>
-            <p className="mt-2 text-xs text-neutral-400">
-              Спасибо за участие! Ваши снимки ({uploadedCount}) переданы организатору мероприятия.
+
+            <p className="mt-2 text-sm text-neutral-300 max-w-md mx-auto leading-relaxed">
+              Спасибо за участие! Ваш снимок передан в альбом <span className="font-semibold text-white">«{album.title}»</span>.
             </p>
 
-            <div className="mt-6 flex justify-center">
+            <p className="mt-1 text-xs text-emerald-400/90 font-medium">
+              ✓ Организатор уже получил фото и видит его на сайте.
+            </p>
+
+            {/* Thumbnails of what was sent */}
+            {uploadedPhotos.length > 0 && (
+              <div className="mt-6 border-t border-neutral-800 pt-5">
+                <div className="text-xs text-neutral-400 mb-3 font-medium">
+                  Отправлено фотографий: {uploadedPhotos.length}
+                </div>
+                <div className="flex flex-wrap justify-center gap-3">
+                  {uploadedPhotos.map((photo, i) => (
+                    <div
+                      key={i}
+                      className="relative h-24 w-24 overflow-hidden rounded-xl border border-emerald-500/40 shadow-md group"
+                    >
+                      <img
+                        src={photo.previewUrl}
+                        alt={photo.filename}
+                        className="h-full w-full object-cover"
+                      />
+                      <div className="absolute bottom-1 right-1 rounded-full bg-emerald-500 p-1 text-neutral-950 shadow">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-white" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Action buttons */}
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
               <button
+                type="button"
                 onClick={handleResetForMore}
-                className="flex items-center justify-center gap-2 rounded-xl bg-neutral-100 px-6 py-3 text-xs font-bold text-neutral-950 transition-all hover:bg-white active:scale-95 shadow-md"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-xs font-bold text-neutral-950 transition-all hover:bg-neutral-100 active:scale-95 shadow-lg"
               >
                 <Plus className="h-4 w-4" />
-                <span>Загрузить ещё фотографии</span>
+                <span>Загрузить ещё фото</span>
               </button>
+            </div>
+
+            <div className="mt-6 rounded-xl border border-neutral-800 bg-neutral-950/60 p-3 text-center text-xs text-neutral-400">
+              <span className="text-neutral-300 font-medium">Гостевой режим:</span> вы можете только отправлять фото. Просмотр альбома и удаление снимков доступны только организатору на сайте.
             </div>
           </div>
         ) : (
@@ -312,17 +400,17 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
             {/* Contributor Name Field */}
             <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
               <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-300">
-                {t.contributorNameLabel}
+                Ваше имя (необязательно)
               </label>
               <input
                 type="text"
                 value={contributorName}
                 onChange={(e) => setContributorName(e.target.value)}
-                placeholder={t.contributorNamePlaceholder}
+                placeholder="Например: Анна или Анонимный гость"
                 className="mt-1.5 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3.5 py-2 text-sm text-white placeholder-neutral-500 focus:border-neutral-500 focus:outline-none"
               />
               <p className="mt-1 text-[11px] text-neutral-400">
-                This name will be displayed alongside your photos in the live gallery.
+                Организатор увидит, кто загрузил снимок.
               </p>
             </div>
 
@@ -334,55 +422,57 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
               </div>
             )}
 
-            {/* Drag and drop upload zone */}
-            <div
+            {/* Mobile-Friendly Upload Buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Native Camera Trigger */}
+              <label
+                htmlFor="guest-camera-input"
+                className="flex items-center justify-center gap-2.5 rounded-xl border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 hover:border-neutral-600 px-4 py-3.5 text-xs font-bold text-white cursor-pointer transition-all active:scale-95 shadow-sm"
+              >
+                <Camera className="h-4 w-4 text-emerald-400" />
+                <span>Сделать фото на камеру</span>
+              </label>
+
+              {/* Native Gallery Trigger */}
+              <label
+                htmlFor="guest-gallery-input"
+                className="flex items-center justify-center gap-2.5 rounded-xl border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 hover:border-neutral-600 px-4 py-3.5 text-xs font-bold text-white cursor-pointer transition-all active:scale-95 shadow-sm"
+              >
+                <ImageIcon className="h-4 w-4 text-sky-400" />
+                <span>Выбрать из галереи</span>
+              </label>
+            </div>
+
+            {/* Drag and drop upload zone (also clickable) */}
+            <label
+              htmlFor="guest-gallery-input"
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition-all ${
+              className={`block cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition-all ${
                 isDragging
                   ? 'border-sky-400 bg-sky-950/20'
                   : 'border-neutral-700 bg-neutral-900/60 hover:border-neutral-600 hover:bg-neutral-900'
               }`}
             >
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept="image/jpeg,image/png,image/webp,image/jpg"
-                onChange={(e) => handleFiles(e.target.files)}
-                className="hidden"
-              />
-
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-neutral-700 bg-neutral-950 text-neutral-300 shadow-inner">
                 <UploadCloud className="h-7 w-7 text-neutral-400" />
               </div>
 
               <h4 className="mt-4 text-sm font-bold text-white sm:text-base">
-                {t.dropPhotosHere}
+                Нажмите для выбора фото или перетащите сюда
               </h4>
               <p className="mt-1 text-xs text-neutral-400">
-                {t.uploadLimitNotice}
+                Поддерживаются JPG, PNG, HEIC с телефона (до 30 МБ)
               </p>
-
-              {/* Mobile CTA */}
-              <div className="mt-5 sm:hidden">
-                <button
-                  type="button"
-                  className="w-full rounded-xl bg-neutral-100 py-3 text-xs font-bold text-neutral-950 shadow-md active:scale-95"
-                >
-                  {t.mobilePickerBtn}
-                </button>
-              </div>
-            </div>
+            </label>
 
             {/* Preview of pending files */}
             {queue.length > 0 && (
               <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
                 <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
                   <span className="text-xs font-bold text-white">
-                    Selected Photos ({queue.length})
+                    Выбрано фото для отправки ({queue.length})
                   </span>
                   <button
                     type="button"
@@ -390,7 +480,7 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
                     disabled={isUploading}
                     className="text-xs text-neutral-400 hover:text-white"
                   >
-                    Clear All
+                    Очистить
                   </button>
                 </div>
 
@@ -416,6 +506,7 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
                         <button
                           type="button"
                           onClick={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
                             removeQueueItem(item.id);
                           }}
@@ -427,7 +518,7 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
 
                       {/* Status / Progress overlay */}
                       {item.status === 'uploading' && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-neutral-950/70 p-2">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-neutral-950/80 p-2">
                           <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
                           <span className="mt-1 font-mono text-[10px] text-white">
                             {item.progress}%
@@ -454,18 +545,18 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
                     type="button"
                     onClick={startUpload}
                     disabled={isUploading}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-neutral-100 py-3 text-xs font-bold text-neutral-950 transition-all hover:bg-white active:scale-95 shadow-md disabled:opacity-50"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-white py-3.5 text-xs font-bold text-neutral-950 transition-all hover:bg-neutral-100 active:scale-95 shadow-md disabled:opacity-50"
                   >
                     {isUploading ? (
                       <>
                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-950 border-t-transparent" />
-                        <span>{t.uploadingBatch}</span>
+                        <span>Сжатие и отправка фото в альбом...</span>
                       </>
                     ) : (
                       <>
                         <UploadCloud className="h-4 w-4" />
                         <span>
-                          {t.uploadSelectedPhotos} ({queue.length})
+                          Отправить фото в альбом ({queue.length})
                         </span>
                       </>
                     )}

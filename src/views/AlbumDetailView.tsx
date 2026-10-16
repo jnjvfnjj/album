@@ -22,7 +22,8 @@ import {
   MapPin,
   Lock,
   Globe,
-  AlertTriangle
+  AlertTriangle,
+  RefreshCw
 } from 'lucide-react';
 
 interface AlbumDetailViewProps {
@@ -37,6 +38,7 @@ export const AlbumDetailView: React.FC<AlbumDetailViewProps> = ({ id }) => {
   const [album, setAlbum] = useState<Album | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -58,7 +60,27 @@ export const AlbumDetailView: React.FC<AlbumDetailViewProps> = ({ id }) => {
 
   useEffect(() => {
     loadData();
+
+    // Auto-poll every 3 seconds for live guest uploads
+    const interval = setInterval(async () => {
+      if (id) {
+        try {
+          const list = await storageService.getPhotosForAlbum(id);
+          setPhotos(list);
+        } catch {
+          // ignore
+        }
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
   }, [id]);
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    await loadData();
+    setTimeout(() => setIsRefreshing(false), 500);
+  };
 
   const handleToggleUploads = async () => {
     if (!album) return;
@@ -74,7 +96,7 @@ export const AlbumDetailView: React.FC<AlbumDetailViewProps> = ({ id }) => {
 
   const handleDeletePhoto = async (photoId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('Are you sure you want to delete this photo from the album?')) return;
+    if (!confirm('Удалить эту фотографию из альбома?')) return;
     await storageService.deletePhoto(photoId);
     setPhotos((prev) => prev.filter((p) => p.id !== photoId));
   };
@@ -86,7 +108,10 @@ export const AlbumDetailView: React.FC<AlbumDetailViewProps> = ({ id }) => {
     setIsUploading(true);
     for (let i = 0; i < files.length; i++) {
       try {
-        await storageService.uploadPhoto(album.id, files[i], 'Album Owner');
+        await storageService.uploadPhoto(album.id, files[i], 'Организатор', {
+          title: album.title,
+          publicToken: album.publicToken,
+        });
       } catch (err) {
         console.warn('Upload error', err);
       }
@@ -296,20 +321,39 @@ export const AlbumDetailView: React.FC<AlbumDetailViewProps> = ({ id }) => {
 
       {/* Main Photos Grid & Controls */}
       <main className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between border-b border-neutral-800 pb-4">
-          <div className="flex items-center gap-2">
-            <h2 className="text-base font-bold text-white">Album Photos</h2>
-            <span className="font-mono text-xs text-neutral-400 tabular-nums">({photos.length})</span>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-neutral-800 pb-4 gap-3">
+          <div className="flex items-center gap-3">
+            <h2 className="text-base font-bold text-white">Фотографии альбома</h2>
+            <span className="rounded-full bg-neutral-800 px-2.5 py-0.5 font-mono text-xs text-neutral-300 font-semibold tabular-nums">
+              {photos.length}
+            </span>
+            <span className="flex items-center gap-1.5 text-xs text-emerald-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Автосинхронизация</span>
+            </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Manual Refresh */}
+            <button
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+              className="flex items-center gap-1.5 rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-1.5 text-xs font-medium text-neutral-300 hover:bg-neutral-800 hover:text-white transition-colors"
+              title="Обновить список фото"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin text-sky-400' : ''}`} />
+              <span>Обновить</span>
+            </button>
+
+            {/* Download ZIP */}
             <button
               onClick={handleDownloadZip}
               disabled={photos.length === 0 || isZipping}
               className="flex items-center gap-1.5 rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-1.5 text-xs font-medium text-neutral-300 hover:bg-neutral-800 hover:text-white transition-colors disabled:opacity-50"
+              title="Скачать все фотографии одним архивом"
             >
               <Download className="h-3.5 w-3.5" />
-              <span>{isZipping ? 'Creating ZIP...' : 'Download ZIP'}</span>
+              <span>{isZipping ? 'Сборка архива...' : 'Скачать все разом (ZIP)'}</span>
             </button>
 
             {/* Direct Upload input */}
@@ -327,7 +371,7 @@ export const AlbumDetailView: React.FC<AlbumDetailViewProps> = ({ id }) => {
               className="flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800 transition-colors"
             >
               <Upload className="h-3.5 w-3.5" />
-              <span>{isUploading ? 'Uploading...' : 'Add Photos'}</span>
+              <span>{isUploading ? 'Загрузка...' : 'Добавить фото'}</span>
             </button>
           </div>
         </div>
@@ -336,9 +380,9 @@ export const AlbumDetailView: React.FC<AlbumDetailViewProps> = ({ id }) => {
         {photos.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-800 bg-neutral-900/30 py-16 text-center mt-6">
             <ImageIcon className="h-10 w-10 text-neutral-600" />
-            <h4 className="mt-3 text-sm font-bold text-white">No photos collected yet</h4>
-            <p className="mt-1 text-xs text-neutral-400">
-              Share the QR code or guest link with attendees to start collecting photos.
+            <h4 className="mt-3 text-sm font-bold text-white">В этом альбоме пока нет фотографий</h4>
+            <p className="mt-1 text-xs text-neutral-400 max-w-md mx-auto">
+              Отсканируйте QR-код на телефоне или отправьте ссылку гостям, чтобы собрать фотографии события.
             </p>
             <div className="mt-5 flex gap-2">
               <button
@@ -346,14 +390,14 @@ export const AlbumDetailView: React.FC<AlbumDetailViewProps> = ({ id }) => {
                 className="flex items-center gap-1.5 rounded-lg bg-neutral-100 px-4 py-2 text-xs font-bold text-neutral-950 hover:bg-white"
               >
                 <QrCode className="h-3.5 w-3.5" />
-                <span>Show QR Code</span>
+                <span>Показать QR-код</span>
               </button>
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-900 px-4 py-2 text-xs font-medium text-white hover:bg-neutral-800"
               >
                 <Upload className="h-3.5 w-3.5" />
-                <span>Upload Photos</span>
+                <span>Загрузить фото</span>
               </button>
             </div>
           </div>
