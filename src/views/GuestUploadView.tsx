@@ -280,19 +280,19 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token = '' }) 
             {album.title}
           </h1>
 
-          {album.description && (
+          {album.description ? (
             <p className="mt-2 text-xs sm:text-sm text-neutral-400 leading-relaxed">
               {album.description}
             </p>
-          )}
+          ) : null}
 
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-neutral-400">
-            {album.location && (
+            {album.location ? (
               <span>📍 {album.location}</span>
-            )}
-            {safeFormatDate(album.eventDate) && (
+            ) : null}
+            {safeFormatDate(album.eventDate) ? (
               <span>🗓️ {safeFormatDate(album.eventDate)}</span>
-            )}
+            ) : null}
             <span className="flex items-center gap-1.5 rounded-full border border-emerald-800/60 bg-emerald-950/40 px-2.5 py-0.5 text-emerald-300 font-medium">
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
               <span>QR-код бессрочен (24+ часа) · Прямая отправка в альбом</span>
