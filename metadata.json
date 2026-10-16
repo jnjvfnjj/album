@@ -1,0 +1,6 @@
+{
+  "name": "Aperture Live",
+  "description": "Collaborative event photo sharing platform with unique QR codes, instant mobile guest uploads, and live event galleries.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
