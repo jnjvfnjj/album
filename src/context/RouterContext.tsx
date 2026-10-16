@@ -28,24 +28,28 @@ const RouterContext = createContext<RouterContextType | undefined>(undefined);
 
 function parseRoute(currentPath: string): RouteMatch {
   // Normalize path from pathname, hash or query
-  let path = currentPath.split('?')[0] || '/';
+  let path = (currentPath || '/').split('?')[0] || '/';
   if (path.startsWith('#')) path = path.slice(1);
   if (!path.startsWith('/')) path = '/' + path;
 
   // Check query parameters for guest upload: ?upload=token or ?u=token (supporting both query & hash routing)
   if (typeof window !== 'undefined') {
-    let search = window.location.search;
-    if (!search && window.location.hash.includes('?')) {
-      search = window.location.hash.slice(window.location.hash.indexOf('?'));
-    }
-    const params = new URLSearchParams(search);
-    const uploadToken = params.get('upload') || params.get('u') || params.get('token');
-    if (uploadToken) {
-      return { route: '/upload/:token', params: { token: uploadToken }, pathname: `/upload/${uploadToken}` };
-    }
-    const galleryToken = params.get('gallery') || params.get('g');
-    if (galleryToken) {
-      return { route: '/gallery/:token', params: { token: galleryToken }, pathname: `/gallery/${galleryToken}` };
+    try {
+      let search = window.location.search || '';
+      if (!search && window.location.hash && window.location.hash.includes('?')) {
+        search = window.location.hash.slice(window.location.hash.indexOf('?'));
+      }
+      const params = new URLSearchParams(search);
+      const uploadToken = params.get('upload') || params.get('u') || params.get('token');
+      if (uploadToken) {
+        return { route: '/upload/:token', params: { token: uploadToken }, pathname: `/upload/${uploadToken}` };
+      }
+      const galleryToken = params.get('gallery') || params.get('g');
+      if (galleryToken) {
+        return { route: '/gallery/:token', params: { token: galleryToken }, pathname: `/gallery/${galleryToken}` };
+      }
+    } catch (e) {
+      console.warn('Router parse query error', e);
     }
   }
 

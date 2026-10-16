@@ -37,15 +37,16 @@ export function buildPublicGalleryUrl(album: Album, baseUrl?: string): string {
  * Reconstructs or enriches an album from URL query parameters if it's missing from local/server DB
  * (e.g. when a new phone scans a QR code for an album created on another computer).
  */
-export function extractAlbumFromUrl(token: string): Album {
-  const fallbackTitle = `Мероприятие (${token ? token.substring(0, 6) : 'Live'})`;
+export function extractAlbumFromUrl(token?: string): Album {
+  const safeToken = token || '';
+  const fallbackTitle = `Мероприятие (${safeToken ? safeToken.substring(0, 6) : 'Live'})`;
   if (typeof window === 'undefined') {
     return {
-      id: `album_${token}`,
+      id: `album_${safeToken || 'live'}`,
       ownerId: 'external_guest',
       title: fallbackTitle,
       coverUrl: SAMPLE_COVERS.aiSummit,
-      publicToken: token,
+      publicToken: safeToken,
       privacy: 'public',
       uploadsEnabled: true,
       createdAt: new Date().toISOString(),
@@ -69,10 +70,21 @@ export function extractAlbumFromUrl(token: string): Album {
     };
 
     const rawTitle = params.get('t') || params.get('name') || params.get('title');
-    const albumId = params.get('id') || `album_${token}`;
+    const albumId = params.get('id') || `album_${safeToken || 'live'}`;
     const rawDesc = params.get('d') || params.get('desc');
     const rawLoc = params.get('l') || params.get('loc');
-    const eventDate = params.get('dt') || params.get('date') || undefined;
+    const rawDt = params.get('dt') || params.get('date');
+    let eventDate: string | undefined = undefined;
+    if (rawDt && rawDt !== 'undefined' && rawDt !== 'null') {
+      try {
+        const parsed = new Date(rawDt);
+        if (!isNaN(parsed.getTime())) {
+          eventDate = rawDt;
+        }
+      } catch {
+        eventDate = undefined;
+      }
+    }
     const privacy = (params.get('p') as 'public' | 'code_protected') || 'public';
 
     const title = rawTitle ? safeDecode(rawTitle) : fallbackTitle;
@@ -85,7 +97,7 @@ export function extractAlbumFromUrl(token: string): Album {
       title: title || fallbackTitle,
       description,
       coverUrl: SAMPLE_COVERS.aiSummit,
-      publicToken: token,
+      publicToken: safeToken,
       privacy,
       uploadsEnabled: true,
       createdAt: new Date().toISOString(),
@@ -95,11 +107,11 @@ export function extractAlbumFromUrl(token: string): Album {
   } catch (err) {
     console.warn('Failed to parse album from URL', err);
     return {
-      id: `album_${token}`,
+      id: `album_${safeToken || 'live'}`,
       ownerId: 'external_guest',
       title: fallbackTitle,
       coverUrl: SAMPLE_COVERS.aiSummit,
-      publicToken: token,
+      publicToken: safeToken,
       privacy: 'public',
       uploadsEnabled: true,
       createdAt: new Date().toISOString(),

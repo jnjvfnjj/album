@@ -3,6 +3,7 @@ import { Album, Photo } from '../types';
 import { storageService } from '../services/storageService';
 import { useRouter } from '../context/RouterContext';
 import { useI18n } from '../utils/i18n';
+import { safeFormatDate } from '../utils/dateUtils';
 import { Navbar } from '../components/layout/Navbar';
 import { ShareModal } from '../components/dashboard/ShareModal';
 import { CreateAlbumModal } from '../components/dashboard/CreateAlbumModal';
@@ -226,12 +227,12 @@ export const AlbumDetailView: React.FC<AlbumDetailViewProps> = ({ id }) => {
                       </span>
                     </>
                   )}
-                  {album.eventDate && (
+                  {safeFormatDate(album.eventDate) && (
                     <>
                       <span aria-hidden="true">·</span>
                       <span className="flex items-center gap-1">
                         <Calendar className="h-3 w-3 text-neutral-500" />
-                        <span>{new Date(album.eventDate).toLocaleDateString()}</span>
+                        <span>{safeFormatDate(album.eventDate)}</span>
                       </span>
                     </>
                   )}
@@ -433,7 +434,7 @@ export const AlbumDetailView: React.FC<AlbumDetailViewProps> = ({ id }) => {
 
                   <div className="flex items-center justify-between text-[11px] text-neutral-400">
                     <span className="font-mono">
-                      {new Date(photo.createdAt).toLocaleDateString()}
+                      {safeFormatDate(photo.createdAt)}
                     </span>
                     <button
                       onClick={(e) => {

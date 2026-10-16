@@ -33,15 +33,39 @@ export class ErrorBoundary extends Component<Props, State> {
             </div>
             <h2 className="mt-4 text-base font-bold text-white">Что-то пошло не так</h2>
             <p className="mt-2 text-xs text-neutral-400">
-              Произошла непредвиденная ошибка отображения. Нажмите кнопку ниже, чтобы перезагрузить страницу.
+              Произошла непредвиденная ошибка отображения.
             </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-neutral-950 hover:bg-neutral-100 transition-colors"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              <span>Обновить страницу</span>
-            </button>
+
+            {this.state.error?.message && (
+              <div className="mt-3 max-h-36 overflow-y-auto rounded-lg bg-neutral-950 p-2.5 text-left font-mono text-[11px] text-red-400 border border-neutral-800 break-words whitespace-pre-wrap">
+                {this.state.error.name}: {this.state.error.message}
+              </div>
+            )}
+
+            <div className="mt-5 flex flex-col gap-2">
+              <button
+                onClick={() => window.location.reload()}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-neutral-950 hover:bg-neutral-100 transition-colors"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                <span>Обновить страницу</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  try {
+                    localStorage.clear();
+                    sessionStorage.clear();
+                  } catch {
+                    // ignore
+                  }
+                  window.location.href = '/';
+                }}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-neutral-800 bg-neutral-950 px-4 py-2 text-xs font-semibold text-neutral-300 hover:bg-neutral-800 hover:text-white transition-colors"
+              >
+                <span>Очистить кэш и на главную</span>
+              </button>
+            </div>
           </div>
         </div>
       );

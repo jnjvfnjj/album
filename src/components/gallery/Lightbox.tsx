@@ -1,6 +1,7 @@
 import React, { useEffect, useCallback } from 'react';
 import { Photo } from '../../types';
 import { storageService } from '../../services/storageService';
+import { safeFormatDate } from '../../utils/dateUtils';
 import { X, ChevronLeft, ChevronRight, Download, User, Calendar } from 'lucide-react';
 
 interface LightboxProps {
@@ -55,7 +56,7 @@ export const Lightbox: React.FC<LightboxProps> = ({
     storageService.downloadSinglePhoto(currentPhoto);
   };
 
-  const formattedDate = new Date(currentPhoto.createdAt).toLocaleDateString('en-US', {
+  const formattedDate = safeFormatDate(currentPhoto.createdAt, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',

@@ -166,9 +166,10 @@ class StorageService {
   }
 
   // Synchronous lookup for 0ms instant mobile rendering
-  public getCachedAlbumByToken(token: string): Album | undefined {
+  public getCachedAlbumByToken(token?: string): Album | undefined {
     if (!this.initialized) this.init();
-    const normalized = token.trim().toLowerCase();
+    const normalized = (token || '').trim().toLowerCase();
+    if (!normalized) return undefined;
     const local = this.albums.find((a) => a.publicToken.toLowerCase() === normalized);
     if (local) return local;
 
@@ -183,36 +184,40 @@ class StorageService {
   }
 
   // CRITICAL FOR QR SCANNING FROM ANY PHONE / DEVICE!
-  public async getAlbumByToken(token: string): Promise<Album> {
+  public async getAlbumByToken(token?: string): Promise<Album> {
     if (!this.initialized) this.init();
-    const normalized = token.trim().toLowerCase();
+    const normalized = (token || '').trim().toLowerCase();
 
     // 1. Check local memory
-    const local = this.albums.find((a) => a.publicToken.toLowerCase() === normalized);
-    if (local) return local;
+    if (normalized) {
+      const local = this.albums.find((a) => a.publicToken.toLowerCase() === normalized);
+      if (local) return local;
+    }
 
     // 2. Fetch from server with 2.5s strict timeout so phone never hangs
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500);
+    if (normalized) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
 
-      const res = await fetch(`/api/albums/by-token/${normalized}`, {
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
+        const res = await fetch(`/api/albums/by-token/${normalized}`, {
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
 
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('application/json')) {
-        const album = await res.json();
-        if (album && album.publicToken) {
-          // Cache locally on this device
-          this.albums.unshift(album);
-          this.saveAlbums();
-          return album;
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('application/json')) {
+          const album = await res.json();
+          if (album && album.publicToken) {
+            // Cache locally on this device
+            this.albums.unshift(album);
+            this.saveAlbums();
+            return album;
+          }
         }
+      } catch (err) {
+        console.warn('Fetch album by token from server failed or timed out', err);
       }
-    } catch (err) {
-      console.warn('Fetch album by token from server failed or timed out', err);
     }
 
     // 3. Fallback to URL-embedded album metadata or guaranteed fallback object

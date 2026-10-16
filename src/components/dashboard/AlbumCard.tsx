@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Album } from '../../types';
 import { useRouter } from '../../context/RouterContext';
 import { useI18n } from '../../utils/i18n';
+import { safeFormatDate } from '../../utils/dateUtils';
 import {
   QrCode,
   Download,
@@ -50,9 +51,9 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({
     }
   };
 
-  const formattedDate = album.eventDate
-    ? new Date(album.eventDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    : new Date(album.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const formattedDate = safeFormatDate(album.eventDate, { month: 'short', day: 'numeric', year: 'numeric' })
+    || safeFormatDate(album.createdAt, { month: 'short', day: 'numeric', year: 'numeric' })
+    || 'Активен';
 
   return (
     <div className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 transition-all duration-200 hover:border-neutral-700 hover:shadow-lg">

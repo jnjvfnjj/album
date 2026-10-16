@@ -237,8 +237,15 @@ export const translations = {
   }
 };
 
-let currentLang: Language =
-  (typeof window !== 'undefined' && (localStorage.getItem('aperture_lang') as Language)) || 'ru';
+let currentLang: Language = 'ru';
+try {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('aperture_lang');
+    if (saved === 'en' || saved === 'ru') currentLang = saved;
+  }
+} catch {
+  // Ignore localStorage restrictions
+}
 
 export function getLanguage(): Language {
   return currentLang;
@@ -246,8 +253,12 @@ export function getLanguage(): Language {
 
 export function setLanguage(lang: Language): void {
   currentLang = lang;
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('aperture_lang', lang);
+  try {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('aperture_lang', lang);
+    }
+  } catch {
+    // Ignore localStorage restrictions
   }
 }
 

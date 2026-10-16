@@ -29,18 +29,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    // Check local storage for persistent session
-    const savedUser = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch {
+    try {
+      const savedUser = localStorage.getItem(AUTH_STORAGE_KEY);
+      if (savedUser) {
+        try {
+          setUser(JSON.parse(savedUser));
+        } catch {
+          setUser(DEMO_USER);
+        }
+      } else {
         setUser(DEMO_USER);
+        try {
+          localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(DEMO_USER));
+        } catch {
+          // ignore private browsing quota errors
+        }
       }
-    } else {
-      // Default to Demo User so the user can immediately explore without friction
+    } catch {
       setUser(DEMO_USER);
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(DEMO_USER));
     }
   }, []);
 

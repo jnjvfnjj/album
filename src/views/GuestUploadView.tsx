@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Album, UploadItem } from '../types';
 import { storageService } from '../services/storageService';
 import { extractAlbumFromUrl } from '../utils/albumUrl';
+import { safeFormatDate } from '../utils/dateUtils';
 import { useRouter } from '../context/RouterContext';
 import { useI18n } from '../utils/i18n';
 import {
@@ -19,19 +20,23 @@ import {
 } from 'lucide-react';
 
 interface GuestUploadViewProps {
-  token: string;
+  token?: string;
 }
 
 const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30 MB
 
-export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
+export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token = '' }) => {
   const { navigate } = useRouter();
   const { t } = useI18n();
 
   // Instant 0ms synchronous resolution: loads immediately on phone without any dark waiting screen
   const [album, setAlbum] = useState<Album>(() => {
-    const cached = storageService.getCachedAlbumByToken(token);
-    if (cached) return cached;
+    try {
+      const cached = storageService.getCachedAlbumByToken(token);
+      if (cached) return cached;
+    } catch (e) {
+      console.warn('Error reading cached album', e);
+    }
     return extractAlbumFromUrl(token);
   });
   const [loading, setLoading] = useState(false);
@@ -285,8 +290,8 @@ export const GuestUploadView: React.FC<GuestUploadViewProps> = ({ token }) => {
             {album.location && (
               <span>📍 {album.location}</span>
             )}
-            {album.eventDate && (
-              <span>🗓️ {new Date(album.eventDate).toLocaleDateString('ru-RU')}</span>
+            {safeFormatDate(album.eventDate) && (
+              <span>🗓️ {safeFormatDate(album.eventDate)}</span>
             )}
             <span className="flex items-center gap-1.5 rounded-full border border-emerald-800/60 bg-emerald-950/40 px-2.5 py-0.5 text-emerald-300 font-medium">
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />

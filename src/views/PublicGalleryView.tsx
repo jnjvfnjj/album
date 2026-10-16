@@ -3,6 +3,7 @@ import { Album, Photo } from '../types';
 import { storageService } from '../services/storageService';
 import { useRouter } from '../context/RouterContext';
 import { useI18n } from '../utils/i18n';
+import { safeFormatDate } from '../utils/dateUtils';
 import { Lightbox } from '../components/gallery/Lightbox';
 import {
   Download,
@@ -160,10 +161,10 @@ export const PublicGalleryView: React.FC<PublicGalleryViewProps> = ({ token }) =
             <div>
               <div className="flex items-center gap-2 text-xs text-neutral-400">
                 <span>{album.location || 'Live Event'}</span>
-                {album.eventDate && (
+                {safeFormatDate(album.eventDate) && (
                   <>
                     <span aria-hidden="true">·</span>
-                    <span>{new Date(album.eventDate).toLocaleDateString()}</span>
+                    <span>{safeFormatDate(album.eventDate)}</span>
                   </>
                 )}
                 <span aria-hidden="true">·</span>
